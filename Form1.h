@@ -27,6 +27,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+
 */
 #pragma once
 
@@ -529,7 +530,7 @@ namespace show {
 			this->Controls->Add(this->dataGridView1);
 			this->FormBorderStyle = System::Windows::Forms::FormBorderStyle::FixedSingle;
 			this->Name = L"Form1";
-			this->Text = L"pupille";
+			this->Text = L"pupille 1.5";
 			this->FormClosing += gcnew System::Windows::Forms::FormClosingEventHandler(this, &Form1::Form1_FormClosing);
 			this->Load += gcnew System::EventHandler(this, &Form1::Form1_Load);
 			(cli::safe_cast<System::ComponentModel::ISupportInitialize^  >(this->dataGridView1))->EndInit();
@@ -617,12 +618,18 @@ namespace show {
 						secondlineOfTXT = line;
 
 						for(i=0;i < words->Length; i++){
-						    dataGridView1->Columns->Add(words[i], words[i]);
+							int intFoo = -1;
+							dataGridView1->Columns->Add(words[i], words[i]);
+
+							if (words[i] != "event"){
+								dataGridView1->Columns[words[i]]->ValueType = intFoo.GetType();
+							}
+
+							dataGridView1->Columns[words[i]]->ReadOnly = true;
 						}
 
-						int intFoo = -1;
+					    int intFoo = -1;
 						dataGridView1->Columns["index"]->ValueType = intFoo.GetType();
-
 						dataGridView1->Columns->Add("templateX", "templateX");//template was found at tempX tempY
 						dataGridView1->Columns["templateX"]->ValueType = intFoo.GetType();
 						dataGridView1->Columns->Add("templateY", "templateY");
@@ -633,15 +640,30 @@ namespace show {
 						dataGridView1->Columns["aboveThres"]->ValueType = intFoo.GetType();
 
 
-						dataGridView1->Columns[0]->Frozen = true;
+						dataGridView1->Columns[0]->Frozen = true;//index column always visible
 
 					}
+
 					if (count > 1){
-						dataGridView1->Rows->Add(words);
-					}
-					count++;
+						  //dataGridView1->Rows->Add(words);//insert everything as string
+						  dataGridView1->Rows->Add();//insert empty row
+						  
+						  int r = dataGridView1->Rows->Count-1;//last row
+						 
+						  Int32 numValue;
+						  for(i=0;i < words->Length; i++){//try to parse everything as int, if possible (trigger-events will fail)
+							String^ name = dataGridView1->Columns[i]->Name;
+							bool parsed = Int32::TryParse(words[i], numValue);
+							if (parsed) dataGridView1->Rows[r]->Cells[name]->Value = numValue;//insert int
+							else dataGridView1->Rows[r]->Cells[name]->Value = words[i];//insert string
+						  }
 
-				  }
+						  
+					}
+
+					count++;
+				  }//while
+
 				 }catch(...){
 					 openCVstatus->AppendText("Fehler beim Öffnen oder Lesen von Datei: " + this->openFileDialog1->FileName + " Zeile: " + count.ToString());
 				 }
@@ -792,7 +814,40 @@ private: System::Void show(int row){
 			double frameRate = (double) cvGetCaptureProperty(capture1, CV_CAP_PROP_FPS);
 			double frameTime = 1000.0 * (double)frame / (double)frameRate;
 			cvSetCaptureProperty(capture1, CV_CAP_PROP_POS_MSEC, frameTime);
+
 			eyeFrame = cvQueryFrame(capture1);
+
+			int actualFrame = cvGetCaptureProperty(capture1, CV_CAP_PROP_POS_FRAMES)+1;
+
+			if (actualFrame != frame){//we have a problem
+				double frameRate = (double) cvGetCaptureProperty(capture1, CV_CAP_PROP_FPS);
+				double frameTime = 1000.0 * (double)frame / (double)frameRate - 15000;//set to 15 sec before
+				cvSetCaptureProperty(capture1, CV_CAP_PROP_POS_MSEC, frameTime);
+				eyeFrame = cvQueryFrame(capture1);
+				actualFrame = cvGetCaptureProperty(capture1, CV_CAP_PROP_POS_FRAMES)+1;
+
+				if(actualFrame < frame){
+
+					//seek from -15seconds before
+					for(int i=actualFrame; i < frame; i++){//read until frame
+						eyeFrame = cvQueryFrame(capture1);
+					}
+
+				}else{//still a problem
+				   //do a bruteforce sync
+					cvSetCaptureProperty(capture1, CV_CAP_PROP_POS_MSEC, 0);
+					for(int i=0; i <= frame; i++){
+						eyeFrame = cvQueryFrame(capture1);
+					}
+
+				}
+				/*
+				actualFrame = cvGetCaptureProperty(capture1, CV_CAP_PROP_POS_FRAMES)+1;
+				String^ soll = frame.ToString();
+				String^ ist = actualFrame.ToString();
+				MessageBox::Show("soll:"+soll+"| ist:" +ist);
+				*/
+			}
 
 
 			//visualize old eye point---------------------------------------
@@ -877,8 +932,18 @@ public: System::Int32 updateUI(System::Int32 msg, System::Int32 i){
 			   if (msg == MSG_SELECT_ROW){ dataGridView1->FirstDisplayedScrollingRowIndex = i;}
 
 			   if (msg == MSG_PROGRESS){frameT->Text = "processing frame: "+i.ToString() + "/"+dataGridView1->Rows->Count.ToString();}
-			   if (msg == MSG_FORM_OFF){ panel1->Enabled = false; dataGridView1->ReadOnly = true;}
-			   if (msg == MSG_FORM_ON){panel1->Enabled = true; dataGridView1->ReadOnly = false;}
+			   if (msg == MSG_FORM_OFF){ 
+				   panel1->Enabled = false; 
+				   for (int i = 0; i < dataGridView1->Columns->Count; i++){
+					dataGridView1->Columns[i]->SortMode = DataGridViewColumnSortMode::NotSortable;
+				 }
+			   }
+			   if (msg == MSG_FORM_ON){
+				   panel1->Enabled = true; 
+				   for (int i = 0; i < dataGridView1->Columns->Count; i++){
+					dataGridView1->Columns[i]->SortMode = DataGridViewColumnSortMode::Automatic;
+				 }
+			   }
 			   if (msg == MSG_DONE){done();}
 			   
 		   }
@@ -912,6 +977,7 @@ public: System::Void detectThread(){
 				eyeFrame = cvQueryFrame(capture1);
 				IplImage* resultImg[TEMPLATE_COUNT];
 
+
 				for(int n = 0; n<TEMPLATE_COUNT; n++){
 					int resultImg_cols =  eyeFrame->width -  templateFiles[n]->width + 1;
 					int resultImg_rows = eyeFrame->height -  templateFiles[n]->height + 1;
@@ -930,22 +996,24 @@ public: System::Void detectThread(){
 					
 					msgCallback(MSG_PROGRESS, i);
 
+						//double frameTime = 1000.0 * (double)i / (double)frameRate;
+						//cvSetCaptureProperty(capture1, CV_CAP_PROP_POS_MSEC, frameTime);
+						eyeFrame = cvQueryFrame(capture1);
+
 						if ((invalidOnlyRadioButton->Checked) && (dataGridView1->Rows[i]->Cells["eye_valid"]->Value->ToString() == "1")){//invalid only is checked but this row is valid
 							refreshRowColor(i);
 							continue; //  so jump to next round in for
 						}
 
-						//double frameTime = 1000.0 * (double)i / (double)frameRate;
-						//cvSetCaptureProperty(capture1, CV_CAP_PROP_POS_MSEC, frameTime);
-						eyeFrame = cvQueryFrame(capture1);
 
 						cv::Mat tempImg(eyeFrame);
-						int dilation_size = 7;
+						int dilation_size = 3;
 						cv::Mat dilation_element = cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size( 2*dilation_size + 1, 2*dilation_size+1 ), cv::Point( dilation_size, dilation_size ) );
-						int erosion_size = 11;
+						int erosion_size = 7;
 						cv::Mat erosion_element = cv::getStructuringElement(cv::MORPH_ELLIPSE,cv::Size( 2*erosion_size + 1, 2*erosion_size+1 ),cv::Point( erosion_size, erosion_size ) );
 						dilate(tempImg, tempImg, dilation_element);
 						erode(tempImg, tempImg, erosion_element);
+						blur(tempImg, tempImg,cv::Size(21,21));
 
 						IplImage* dilEroImg = new IplImage(tempImg);
 						//cvShowImage("frameWin", dilEroImg); // display the frame
@@ -1037,7 +1105,7 @@ public: System::Void detectThread(){
 }
 
 private: System::Void match_Click(System::Object^  sender, System::EventArgs^  e) {
-		  dataGridView1->Sort(dataGridView1->Columns[1], ListSortDirection::Ascending);
+		  dataGridView1->Sort(dataGridView1->Columns[1], ListSortDirection::Ascending);//sort based on time stamp before start detectionThread
 		   mThread = gcnew Thread(gcnew ThreadStart(this,&show::Form1::detectThread));
 		   mThread->Start();
 
@@ -1084,7 +1152,7 @@ private: System::Void refreshRowColor(int row){
 private: System::String^ save(System::String^ fn){
 
 	try{
-			dataGridView1->Sort(dataGridView1->Columns[1], ListSortDirection::Ascending);
+			dataGridView1->Sort(dataGridView1->Columns[1], ListSortDirection::Ascending);//sort based on timestamp before saving
 
 			DateTime^ cpCurrentDateTime = DateTime::Now;
 			//String^ fn = this->openFileDialog1->FileName;
@@ -1142,7 +1210,7 @@ private: System::Void saveButton_Click(System::Object^  sender, System::EventArg
 private: System::Void acceptB_Click(System::Object^  sender, System::EventArgs^  e) {
 			if (dataGridView1->Rows->Count >0){
 
-				dataGridView1->Sort(dataGridView1->Columns[1], ListSortDirection::Ascending);
+				dataGridView1->Sort(dataGridView1->Columns[1], ListSortDirection::Ascending);//sort based on timestamp before applying/accept
 
 				int no_of_frames = (int) cvGetCaptureProperty(capture1, CV_CAP_PROP_FRAME_COUNT);
 				int min = no_of_frames;

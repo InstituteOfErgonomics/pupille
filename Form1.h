@@ -51,8 +51,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 			int p[8];
 	}  ints;
 
-	const int TEMPLATE_COUNT = 20;
-	IplImage* templateFiles[TEMPLATE_COUNT];
+	const int TEMPLATE_COUNT = 20;//generate 20 scaled templates from the original template
+	IplImage* templateFiles[TEMPLATE_COUNT];//store the 20 templates to save time
 
 #pragma managed
 
@@ -530,7 +530,7 @@ namespace show {
 			this->Controls->Add(this->dataGridView1);
 			this->FormBorderStyle = System::Windows::Forms::FormBorderStyle::FixedSingle;
 			this->Name = L"Form1";
-			this->Text = L"pupille 1.5";
+			this->Text = L"pupille 1.7";
 			this->FormClosing += gcnew System::Windows::Forms::FormClosingEventHandler(this, &Form1::Form1_FormClosing);
 			this->Load += gcnew System::EventHandler(this, &Form1::Form1_Load);
 			(cli::safe_cast<System::ComponentModel::ISupportInitialize^  >(this->dataGridView1))->EndInit();
@@ -639,6 +639,10 @@ namespace show {
 						dataGridView1->Columns->Add("aboveThres", "aboveThres");
 						dataGridView1->Columns["aboveThres"]->ValueType = intFoo.GetType();
 
+						//index is sometimes != frame (first frames sometimes have strange index e.g. 7531, etc)
+						dataGridView1->Columns->Add("frame", "frame");//therefore 'frame' column is kind of unique ID 
+						dataGridView1->Columns["frame"]->ValueType = intFoo.GetType();
+						dataGridView1->Columns["frame"]->ReadOnly = true;
 
 						dataGridView1->Columns[0]->Frozen = true;//index column always visible
 
@@ -649,13 +653,14 @@ namespace show {
 						  dataGridView1->Rows->Add();//insert empty row
 						  
 						  int r = dataGridView1->Rows->Count-1;//last row
-						 
+						  dataGridView1->Rows[r]->Cells["frame"]->Value = r;
+
 						  Int32 numValue;
 						  for(i=0;i < words->Length; i++){//try to parse everything as int, if possible (trigger-events will fail)
-							String^ name = dataGridView1->Columns[i]->Name;
-							bool parsed = Int32::TryParse(words[i], numValue);
-							if (parsed) dataGridView1->Rows[r]->Cells[name]->Value = numValue;//insert int
-							else dataGridView1->Rows[r]->Cells[name]->Value = words[i];//insert string
+							String^ name = dataGridView1->Columns[i]->Name;//get column name
+							bool parsed = Int32::TryParse(words[i], numValue);//try to parse data from file
+							if (parsed) dataGridView1->Rows[r]->Cells[name]->Value = numValue;//insert int into column
+							else dataGridView1->Rows[r]->Cells[name]->Value = words[i];//insert string into column
 						  }
 
 						  
@@ -793,9 +798,9 @@ private: System::Void dataGridView1_Enter(System::Object^  sender, System::Event
 private: System::Void show(int row){
 		if (capture1){
 
-			String^ temp = dataGridView1->Rows[row]->Cells["index"]->Value->ToString();
-
+			String^ temp = dataGridView1->Rows[row]->Cells["frame"]->Value->ToString();
 			int frame = Int32::Parse(temp);
+
 			frameT->Text = "frame: "+frame.ToString();
 
 			int no_of_frames = (int) cvGetCaptureProperty(capture1, CV_CAP_PROP_FRAME_COUNT);
@@ -1144,13 +1149,14 @@ private: System::Void refreshRowColor(int row){
 
 	}catch(...){
 		dataGridView1->Rows[row]->DefaultCellStyle->BackColor = Color::White;
-		//openCVstatus->AppendText("Error while converting in row:" + row.ToString() +"\r\n" );
+		openCVstatus->AppendText("Error while converting in row:" + row.ToString() +"\r\n" );
 		//MessageBox::Show( "ERROR while converting..");
 	}	
 }
 
 private: System::String^ save(System::String^ fn){
 
+	int row,col = -1; 
 	try{
 			dataGridView1->Sort(dataGridView1->Columns[1], ListSortDirection::Ascending);//sort based on timestamp before saving
 
@@ -1171,9 +1177,9 @@ private: System::String^ save(System::String^ fn){
 				swFileStreamData->Write(secondlineOfTXT );
 				swFileStreamData->Write(newLine);
 
-				for(int i=0;i<dataGridView1->Rows->Count; i++){
-					for(int n=0;n<20; n++){
-						String^ temp = dataGridView1->Rows[i]->Cells[n]->Value->ToString();
+				for(row=0;row<dataGridView1->Rows->Count; row++){
+					for(col;col<20; col++){
+						String^ temp = dataGridView1->Rows[row]->Cells[col]->Value->ToString();
 						swFileStreamData->Write(temp);
 						swFileStreamData->Write(sep);
 					}
@@ -1188,8 +1194,8 @@ private: System::String^ save(System::String^ fn){
 
 	}catch(...){
 		//MessageBox::Show( "ERROR while saving.");
-		openCVstatus->AppendText("Error while saving. \r\n");
-		return "Error while saving.";
+		openCVstatus->AppendText("Error while saving. row:"+ row.ToString() + " col:"+ col.ToString()+ "\r\n");
+		return "Error while saving. row:"+ row.ToString() + " col:"+ col.ToString();
 	}
 	return "Saved to: "+fn;
 

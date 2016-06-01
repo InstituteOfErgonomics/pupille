@@ -530,7 +530,7 @@ namespace show {
 			this->Controls->Add(this->dataGridView1);
 			this->FormBorderStyle = System::Windows::Forms::FormBorderStyle::FixedSingle;
 			this->Name = L"Form1";
-			this->Text = L"pupille 1.7";
+			this->Text = L"pupille 1.8";
 			this->FormClosing += gcnew System::Windows::Forms::FormClosingEventHandler(this, &Form1::Form1_FormClosing);
 			this->Load += gcnew System::EventHandler(this, &Form1::Form1_Load);
 			(cli::safe_cast<System::ComponentModel::ISupportInitialize^  >(this->dataGridView1))->EndInit();
@@ -753,7 +753,7 @@ namespace show {
 			 }
 private: System::Void Form1_FormClosing(System::Object^  sender, System::Windows::Forms::FormClosingEventArgs^  e) {
 
-		if (MessageBox::Show("Are you sure you want to quit? (Did you saved your results?)", "Exit", MessageBoxButtons::YesNo, MessageBoxIcon::Question) == System::Windows::Forms::DialogResult ::Yes){
+		if (MessageBox::Show("Are you sure you want to quit? (Did you save your results?)", "Exit", MessageBoxButtons::YesNo, MessageBoxIcon::Question) == System::Windows::Forms::DialogResult ::Yes){
 			e->Cancel = false;
 		}else{
 			e->Cancel = true;
@@ -1178,7 +1178,7 @@ private: System::String^ save(System::String^ fn){
 				swFileStreamData->Write(newLine);
 
 				for(row=0;row<dataGridView1->Rows->Count; row++){
-					for(col;col<20; col++){
+					for(col=0;col<20; col++){
 						String^ temp = dataGridView1->Rows[row]->Cells[col]->Value->ToString();
 						swFileStreamData->Write(temp);
 						swFileStreamData->Write(sep);
